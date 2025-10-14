@@ -10,7 +10,7 @@ public class Main {
 
         server.addHandler("GET", "/classic.html", new Handler() {
             public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
-                final var path = request.getAction();
+                final var path = request.getPath();
                 final var filePath = Path.of(".", "public", path);
                 final var mimeType = Files.probeContentType(filePath);
 

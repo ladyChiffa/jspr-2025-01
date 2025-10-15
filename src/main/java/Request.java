@@ -1,5 +1,9 @@
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -9,8 +13,9 @@ public class Request {
     public static final String POST = "POST";
 
     protected String method;
-    protected String action;
+    protected String path;
     protected String parameters;
+    protected List<NameValuePair> parameters_post;
     protected List<String> headers;
     protected String body;
     protected String errorDescription = null;
@@ -48,10 +53,10 @@ public class Request {
         }
 
         String[] fullaction = parts[1].split("\\?");
-        action = fullaction[0];
+        path = fullaction[0];
         parameters = fullaction.length > 1 ? fullaction[1] : "";
 
-        if (!action.startsWith("/")) {
+        if (!path.startsWith("/")) {
             errorDescription = "Некорректное имя ресурса";
             return;
         }
@@ -83,10 +88,19 @@ public class Request {
                 final var bodyBytes = in.readNBytes(length);
 
                 body = new String(bodyBytes);
-                System.out.println(body);
+
+                final var contentType = extractHeader(headers, "Content-Type");
+                if (contentType.get().equals("application/x-www-form-urlencoded")) {
+                    parameters_post = URLEncodedUtils.parse(body, StandardCharsets.UTF_8);
+                }
             }
         }
-
+        System.out.println("Request Method: " + method);
+        System.out.println("Request Path: " + path);
+        System.out.println("Request Query Parameters: " + parameters);
+        System.out.println("Request Post Parameters: " + parameters_post);
+        System.out.println("Request headers: " + headers);
+        System.out.println("Request body: " + body);
     }
 
     private static Optional<String> extractHeader(List<String> headers, String header) {
@@ -114,9 +128,16 @@ public class Request {
         return errorDescription == null;
     }
     public String requireHandler (){
-        return method + "," + action;
+        return method + "," + path;
     }
     public String getAction(){
-        return action;
+        return path;
+    }
+    public String getPostParam(String name) {
+        if (parameters_post == null) return null;
+        return parameters_post.stream().filter(p -> p.getName().equals(name)).map(p -> p.getValue()).findFirst().get();
+    }
+    public List<NameValuePair> getPostParams() {
+        return parameters_post;
     }
 }

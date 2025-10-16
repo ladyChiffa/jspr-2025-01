@@ -1,5 +1,7 @@
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -9,10 +11,11 @@ public class Request {
     public static final String POST = "POST";
 
     protected String method;
-    protected String action;
+    protected String path;
     protected String parameters;
     protected List<String> headers;
     protected String body;
+    protected List<MultiParameter> parameters_multipart;
     protected String errorDescription = null;
     public Request (BufferedInputStream in) throws IOException {
         final var allowedMethods = List.of(GET, POST);
@@ -48,10 +51,10 @@ public class Request {
         }
 
         String[] fullaction = parts[1].split("\\?");
-        action = fullaction[0];
+        path = fullaction[0];
         parameters = fullaction.length > 1 ? fullaction[1] : "";
 
-        if (!action.startsWith("/")) {
+        if (!path.startsWith("/")) {
             errorDescription = "Некорректное имя ресурса";
             return;
         }
@@ -83,10 +86,60 @@ public class Request {
                 final var bodyBytes = in.readNBytes(length);
 
                 body = new String(bodyBytes);
-                System.out.println(body);
+
+                final var contentType = extractHeader(headers, "Content-Type");
+                if(contentType.get().startsWith("multipart/form-data")) {
+                    final var contentTypeParts = contentType.get().split("; ");
+                    if (contentTypeParts.length < 2) {
+                        errorDescription = "Ошибка формата тела сообщения";
+                        return;
+                    }
+                    final var boundary = ("--" + contentTypeParts[1].split("=")[1]).getBytes();
+                    final ArrayList<byte[]> body_parts = new ArrayList<>();
+                    var partStart = boundary.length + requestLineDelimiter.length;
+                    var partEnd = indexOf(bodyBytes, boundary, partStart, bodyBytes.length);
+                    while(partEnd > -1) {
+                        byte[] slice = Arrays.copyOfRange(bodyBytes, partStart, partEnd - requestLineDelimiter.length);
+                        body_parts.add(slice);
+                        partStart = partEnd + boundary.length + requestLineDelimiter.length;
+                        partEnd = indexOf(bodyBytes, boundary, partStart, bodyBytes.length);
+                    }
+                    saveMultipart(body_parts);
+                }
             }
         }
+        System.out.println("Request Method: " + method);
+        System.out.println("Request Path: " + path);
+        System.out.println("Request Query Parameters: " + parameters);
+        System.out.println("Request headers: " + headers);
+        // System.out.println("Request body: " + body);
+        System.out.println("Request Body Parts: " + parameters_multipart);
+    }
 
+    private void saveMultipart (ArrayList<byte[]> parts) {
+        parameters_multipart = new ArrayList<>();
+
+        for (int i = 0; i < parts.size(); i++) {
+            final var headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
+            final var part = parts.get(i);
+            final var headersEnd = indexOf(part, headersDelimiter, 0, part.length);
+            if (headersEnd == -1) {
+                continue;
+            }
+
+            final var part_headers = Arrays.copyOfRange(part, 0, headersEnd);
+            final var part_value = Arrays.copyOfRange(part, headersEnd + headersDelimiter.length, part.length);
+
+            final var part_headers_list = Arrays.asList(new String(part_headers).split("\r\n"));
+            final var contentDisposition = extractHeader(part_headers_list, "Content-Disposition");
+            final var contentType = extractHeader(part_headers_list, "Content-Type");
+
+            parameters_multipart.add(new MultiParameter(
+                    new String(part_headers, StandardCharsets.UTF_8),
+                    contentDisposition,
+                    contentType,
+                    part_value));
+        }
     }
 
     private static Optional<String> extractHeader(List<String> headers, String header) {
@@ -114,9 +167,9 @@ public class Request {
         return errorDescription == null;
     }
     public String requireHandler (){
-        return method + "," + action;
+        return method + "," + path;
     }
     public String getAction(){
-        return action;
+        return path;
     }
 }

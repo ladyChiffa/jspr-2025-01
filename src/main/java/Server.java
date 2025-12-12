@@ -3,7 +3,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +23,7 @@ public class Server {
         handlers = new HashMap<>();
         handlers.put("default", new Handler() {
                     public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
-                        final var path = request.getAction();
+                        final var path = request.getPath();
                         final var filePath = Path.of(".", "public", path);
                         final var mimeType = Files.probeContentType(filePath);
 
@@ -78,7 +77,7 @@ public class Server {
             }
 
             Handler handler = handlers.get(request.requireHandler());
-            if (handler == null && validPaths.contains(request.getAction())) {
+            if (handler == null && validPaths.contains(request.getPath())) {
                 handler = handlers.get("default");
             }
 

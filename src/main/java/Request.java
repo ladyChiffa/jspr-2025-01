@@ -1,5 +1,9 @@
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -9,13 +13,14 @@ public class Request {
     public static final String POST = "POST";
 
     protected String method;
-    protected String action;
-    protected String parameters;
+    protected String path;
+    protected List<NameValuePair> parameters;
     protected List<String> headers;
     protected String body;
     protected String errorDescription = null;
     public Request (BufferedInputStream in) throws IOException {
         final var allowedMethods = List.of(GET, POST);
+
         final var limit = 4096;
         in.mark(limit);
         final var buffer = new byte[limit];
@@ -30,11 +35,6 @@ public class Request {
 
         String requestLine = new String(Arrays.copyOf(buffer, requestLineEnd));
 
-        if(requestLine == null) {
-            errorDescription = "Пустая строка запроса";
-            return;
-        }
-
         String[] parts = requestLine.split(" ");
         if(parts.length != 3) {
             errorDescription = "Некорректная строка запроса";
@@ -47,11 +47,11 @@ public class Request {
             return;
         }
 
-        String[] fullaction = parts[1].split("\\?");
-        action = fullaction[0];
-        parameters = fullaction.length > 1 ? fullaction[1] : "";
+        String[] pathparts = parts[1].split("\\?");
+        path = pathparts[0];
+        parameters = pathparts.length > 1 ? URLEncodedUtils.parse(pathparts[1], StandardCharsets.UTF_8) : null;
 
-        if (!action.startsWith("/")) {
+        if (!path.startsWith("/")) {
             errorDescription = "Некорректное имя ресурса";
             return;
         }
@@ -114,9 +114,17 @@ public class Request {
         return errorDescription == null;
     }
     public String requireHandler (){
-        return method + "," + action;
+        return method + "," + path;
     }
-    public String getAction(){
-        return action;
+    public String getPath(){
+        return path;
     }
+    public String getQueryParam(String name) {
+        if (parameters == null) return null;
+        return parameters.stream().filter(p -> p.getName().equals(name)).map(p -> p.getValue()).findFirst().get();
+    }
+    public List<NameValuePair> getQueryParams() {
+        return parameters;
+    }
+
 }

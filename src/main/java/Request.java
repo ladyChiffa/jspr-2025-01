@@ -121,7 +121,7 @@ public class Request {
     }
     public String getQueryParam(String name) {
         if (parameters == null) return null;
-        return parameters.stream().filter(p -> p.getName().equals("d")).map(p -> p.getValue()).findFirst().get();
+        return parameters.stream().filter(p -> p.getName().equals(name)).map(p -> p.getValue()).findFirst().get();
     }
     public List<NameValuePair> getQueryParams() {
         return parameters;

@@ -15,6 +15,7 @@ public class Request {
     protected String method;
     protected String path;
     protected List<NameValuePair> parameters;
+    protected List<NameValuePair> parameters_post;
     protected List<String> headers;
     protected String body;
     protected String errorDescription = null;
@@ -83,10 +84,19 @@ public class Request {
                 final var bodyBytes = in.readNBytes(length);
 
                 body = new String(bodyBytes);
-                System.out.println(body);
+
+                final var contentType = extractHeader(headers, "Content-Type");
+                if (contentType.get().equals("application/x-www-form-urlencoded")) {
+                    parameters_post = URLEncodedUtils.parse(body, StandardCharsets.UTF_8);
+                }
             }
         }
-
+        System.out.println("Request Method: " + method);
+        System.out.println("Request Path: " + path);
+        System.out.println("Request Query Parameters: " + parameters);
+        System.out.println("Request Post Parameters: " + parameters_post);
+        System.out.println("Request headers: " + headers);
+        System.out.println("Request body: " + body);
     }
 
     private static Optional<String> extractHeader(List<String> headers, String header) {
